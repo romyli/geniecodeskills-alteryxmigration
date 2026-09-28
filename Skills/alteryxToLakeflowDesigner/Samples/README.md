@@ -1,6 +1,6 @@
-# alteryx-to-vdp — Sample Workflows
+# alteryx-to-lakeflow-designer — Sample Workflows
 
-End-to-end conversion examples for the `alteryx-to-vdp` skill. Each sample
+End-to-end conversion examples for the `alteryx-to-lakeflow-designer` skill. Each sample
 contains the **source Alteryx workflow** (`.yxmd`) and the **resulting
 Lakeflow Designer Visual Data Prep pipeline** (`.designer.ipynb`) that the
 skill produced from it.
@@ -22,18 +22,18 @@ Catalog at `aldi_aus.demo.raw_test`:
 
 ## Why these samples?
 
-Together the two `.yxmd` files cover the full Alteryx tool palette referenced
-by `SKILL.md` § 2 (Tool Palette → VDP Operator Mapping). Use them as
-regression fixtures when iterating on the skill or as a starting point for
-your own conversion.
+Together the two `.yxmd` files exercise a broad selection of Alteryx tools.
+Use them as regression fixtures when iterating on the skill. The generated
+`.designer.ipynb` files reflect the Designer export format at the time they
+were created; they are examples, not a stable serialization specification.
 
 ## Re-running the conversion
 
 From a Databricks workspace with this skill installed:
 
 ```
-@alteryx-to-vdp convert ./Samples/RetailAnalyticsComplex/RetailAnalyticsComplex.yxmd
-@alteryx-to-vdp convert ./Samples/RetailAnalyticsAdvancedML/RetailAnalyticsAdvancedML.yxmd
+@alteryx-to-lakeflow-designer convert ./Samples/RetailAnalyticsComplex/RetailAnalyticsComplex.yxmd
+@alteryx-to-lakeflow-designer convert ./Samples/RetailAnalyticsAdvancedML/RetailAnalyticsAdvancedML.yxmd
 ```
 
 The skill expects the source CSVs to be available at
