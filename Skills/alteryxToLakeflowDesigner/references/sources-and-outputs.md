@@ -43,6 +43,13 @@ Designer Output supports managed Unity Catalog tables, materialized views, and C
 
 Delta is preferred as a governed system of record, but do not force an extra table when the user has intentionally requested a transient file-only artifact and governance requirements permit it.
 
+When the migration deliberately replaces a file or external destination with a UC table,
+capture the contract change in the Designer graph and handoff. Record the original filename
+or destination class, format details that matter to consumers (for example delimiter,
+encoding, header, BOM, and overwrite behavior), the replacement table or Volume path, and
+the downstream delivery task still required. Do not imply that publishing a table completes
+an SMB, SFTP, email, or other external delivery obligation.
+
 ### Proprietary and network outputs
 
 - Replace Tableau Hyper generation with a UC table and the Databricks Tableau connector when consumers can migrate.

@@ -14,6 +14,21 @@ Expected output is strongly preferred, but its absence need not block inventory,
 
 ## Reconciliation layers
 
+### 0. Structural parity
+
+Before comparable data is available, perform a static review of the inventory and Designer
+graph or exported artifact:
+
+- every effectively enabled Alteryx branch reaches its intended output or an explained manual boundary;
+- disabled-container descendants remain inactive;
+- Join projections preserve selected, dropped, renamed, and ordered fields;
+- published schemas do not contain unintended join keys or collision-generated `right_*` columns;
+- source and output placeholders are parameterized or explicitly listed for replacement;
+- workflow-level Events and other operational side effects have an owner and target Job task or an explicit retirement decision.
+
+Structural parity does not prove value parity, but it can reject an incomplete or
+schema-changing conversion before runtime access is available.
+
 ### 1. Schema
 
 Compare:
@@ -58,6 +73,8 @@ Test representative boundary conditions explicitly:
 - zero denominators, nulls, and invalid numeric strings;
 - threshold boundaries and exception routing;
 - replay of already-processed files or notifications.
+- string-index and delimiter-not-found cases for translated `FindString`/substring logic;
+- empty, null, shorter-than-width, and longer-than-width cases for cleansing and padding logic;
 
 ### 5. Operational behavior
 

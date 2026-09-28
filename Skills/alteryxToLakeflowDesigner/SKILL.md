@@ -40,6 +40,11 @@ Use the XML itself as the source of truth. Identify:
 - external actions such as HTTP calls, email, commands, and file delivery;
 - embedded usernames, passwords, tokens, or connection material.
 
+Use the inventory's effective enabled state: a node inside a disabled Tool Container is
+inactive even when the node itself has no disabled flag. Keep inactive nodes in the
+assessment, but do not translate them into the active Designer graph unless the user
+explicitly asks to restore that behavior. Inspect workflow-level Events as well as tools.
+
 Never copy discovered credentials into generated code, prompts, reports, or Designer operators. Report their presence, recommend rotation when appropriate, and use Unity Catalog connections or Databricks secrets.
 
 ### 2. Classify every dependency
@@ -102,6 +107,10 @@ Only generate or modify raw `.designer.ipynb` serialization when the user explic
 
 Read [references/designer-authoring.md](references/designer-authoring.md) before implementing or generating a Designer artifact.
 
+At handoff, state the highest validation stage actually reached: generated, imported and
+opened, previewed, fully run, or reconciled. Report later stages as outstanding rather than
+using notebook execution metadata as a proxy for Designer validation.
+
 ### 6. Handle side effects deliberately
 
 Do not silently translate operational actions into ordinary data operators.
@@ -131,10 +140,13 @@ Read [references/validation.md](references/validation.md) before running reconci
 ## Completion checklist
 
 - Every Alteryx node is mapped, intentionally omitted, or marked manual with a reason.
+- Disabled nodes are identified separately and are not silently reactivated.
 - Every source has an owner and onboarding path.
 - Credentials and sensitive configuration are not embedded in generated artifacts.
 - Join, filter, deduplication, null, case, and ordering semantics are explicit.
 - External side effects are isolated, preview-safe, and idempotent.
 - Outputs match the agreed consumer contract; Delta is preferred, not forced when inappropriate.
+- Final output projections contain no unintended join keys or collision-generated columns.
+- Workflow-level Events and other operational actions are mapped to Jobs, retained as explicit follow-up work, or intentionally retired.
 - Validation was run on comparable data and material differences are explained.
 - The Designer graph opens successfully and a full run completes, or remaining blockers are stated.

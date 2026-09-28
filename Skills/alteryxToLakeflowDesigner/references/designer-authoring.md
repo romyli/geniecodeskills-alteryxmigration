@@ -17,6 +17,7 @@ Prefer built-ins for common preparation because they are visible, governed, and 
 
 - Give operators names that describe business purpose, not Alteryx tool numbers.
 - Group related branches and add notes for assumptions and manual prerequisites.
+- Add a Note operator when the migration changes a source or consumer contract. Name the original destination, the new Designer output, and any required delivery or Job task. Record workflow-level alerts and other side effects there when they are outside the visual transformation graph.
 - Keep source normalization near each source.
 - Consolidate repeated metric branches into long-form rules where doing so preserves semantics.
 - Materialize only useful boundaries; avoid persistence for every intermediate step.
@@ -67,11 +68,17 @@ If raw artifact generation is explicitly required:
 6. Verify every operator appears, opens, previews, and participates in Run all.
 7. Keep source control diffs reviewable.
 
+The final handoff must distinguish artifact generation from Designer validation. State
+whether the artifact was only generated, imported and opened, previewed, fully run, or
+reconciled. Do not infer these stages from Jupyter execution counts because the notebook is
+Designer serialization rather than a conventional notebook deliverable.
+
 Samples in this repository are regression fixtures, not a stable serialization specification.
 
 ## Parameters and production
 
 - Define visual data prep parameters for catalog, schema, environment, or other supported values.
+- Do not leave `main.default` or similar onboarding placeholders unexplained. Parameterize them when supported; otherwise list every required substitution in a Note operator and the handoff.
 - Store the file in a Databricks Git folder.
 - Add it to a Lakeflow Job as a Visual data prep task when it depends on ingestion or feeds delivery tasks.
 - Use Declarative Automation Bundles and environment targets for production deployment.

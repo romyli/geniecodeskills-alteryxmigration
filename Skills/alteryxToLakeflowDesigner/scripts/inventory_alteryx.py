@@ -91,6 +91,96 @@ def plugin_name(node: ET.Element) -> tuple[str, str | None]:
     return plugin, macro
 
 
+def element_bool(element: ET.Element | None, default: bool = False) -> bool:
+    if element is None:
+        return default
+    value = element.get("value", element.text or "")
+    return clean(value).lower() in {"true", "1", "yes", "on"}
+
+
+def node_is_disabled(node: ET.Element) -> bool:
+    return element_bool(node.find("./Properties/Configuration/Disabled"))
+
+
+def field_projection(configuration: ET.Element | None) -> list[dict[str, Any]]:
+    if configuration is None:
+        return []
+    projection: list[dict[str, Any]] = []
+    for element in configuration.iter():
+        if local_name(element.tag) != "SelectField":
+            continue
+        selected = element.get("selected", "True").lower() != "false"
+        projection.append(
+            {
+                "field": clip(element.get("field", ""), 120),
+                "selected": selected,
+                "rename": clip(element.get("rename", element.get("alias", "")), 120),
+                "input": clip(element.get("input", ""), 40),
+            }
+        )
+    return projection
+
+
+def join_keys(configuration: ET.Element | None) -> list[dict[str, Any]]:
+    if configuration is None:
+        return []
+    result: list[dict[str, Any]] = []
+    for join_info in configuration.iter():
+        if local_name(join_info.tag) != "JoinInfo":
+            continue
+        fields = [
+            clip(field.get("field", ""), 120)
+            for field in join_info.iter()
+            if local_name(field.tag) == "Field" and field.get("field")
+        ]
+        result.append(
+            {
+                "connection": clip(join_info.get("connection", ""), 40),
+                "fields": fields,
+            }
+        )
+    return result
+
+
+def union_settings(configuration: ET.Element | None) -> dict[str, str]:
+    if configuration is None:
+        return {}
+    settings: dict[str, str] = {}
+    for tag in ("Mode", "ByName_OutputMode", "ByName_ErrorMode"):
+        value = first_text(configuration, tag)
+        if value:
+            settings[tag] = clip(value, 80)
+    return settings
+
+
+def output_settings(configuration: ET.Element | None) -> dict[str, str]:
+    if configuration is None:
+        return {}
+    settings: dict[str, str] = {}
+    file_element = next(
+        (element for element in configuration.iter() if local_name(element.tag) == "File"),
+        None,
+    )
+    if file_element is not None:
+        for key in ("FileFormat", "MaxRecords"):
+            if key in file_element.attrib:
+                settings[key] = clip(file_element.get(key, ""), 80)
+    for tag in (
+        "LineEndStyle",
+        "Delimeter",
+        "ForceQuotes",
+        "HeaderRow",
+        "CodePage",
+        "WriteBOM",
+        "SuppressBlankFile",
+        "MultiFile",
+    ):
+        value = first_text(configuration, tag)
+        if value:
+            settings[tag] = clip(value, 80)
+    return settings
+
+
 def contains_secret_material(configuration: ET.Element | None) -> bool:
     if configuration is None:
         return False
@@ -103,7 +193,9 @@ def contains_secret_material(configuration: ET.Element | None) -> bool:
     return bool(SECRET_VALUE_PATTERN.search(serialized) or URL_CREDENTIAL_PATTERN.search(serialized))
 
 
-def node_record(node: ET.Element) -> dict[str, Any]:
+def node_record(
+    node: ET.Element, *, active: bool, inactive_reason: str = ""
+) -> dict[str, Any]:
     plugin, macro = plugin_name(node)
     configuration = node.find("./Properties/Configuration")
     lower = plugin.lower()
@@ -145,6 +237,8 @@ def node_record(node: ET.Element) -> dict[str, Any]:
         "plugin": plugin,
         "tool": tool,
         "macro": macro,
+        "active": active,
+        "inactive_reason": inactive_reason,
         "is_source": any(marker in lower for marker in SOURCE_MARKERS),
         "is_output": any(marker in lower for marker in OUTPUT_MARKERS)
         or any(marker in lower for marker in SIDE_EFFECT_MARKERS),
@@ -155,9 +249,70 @@ def node_record(node: ET.Element) -> dict[str, Any]:
         "expression_count": len(expressions),
         "max_expression_length": max((len(value) for value in expressions), default=0),
         "contains_secret_material": contains_secret_material(configuration),
+        "field_projection": field_projection(configuration),
+        "join_keys": join_keys(configuration),
+        "union_settings": union_settings(configuration) if "union" in lower else {},
+        "output_settings": output_settings(configuration),
         "configuration_text": ET.tostring(configuration, encoding="unicode")
         if configuration is not None
         else "",
+    }
+
+
+def inventory_nodes(root: ET.Element) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+
+    def walk(container: ET.Element | None, parent_active: bool) -> None:
+        if container is None:
+            return
+        for node in container.findall("Node"):
+            own_disabled = node_is_disabled(node)
+            active = parent_active and not own_disabled
+            reason = ""
+            if own_disabled:
+                reason = "disabled node or Tool Container"
+            elif not parent_active:
+                reason = "inside a disabled Tool Container"
+            records.append(node_record(node, active=active, inactive_reason=reason))
+            walk(node.find("ChildNodes"), active)
+
+    walk(root.find("Nodes"), True)
+    return records
+
+
+def workflow_events(root: ET.Element) -> list[dict[str, Any]]:
+    events_element = root.find("./Properties/Events")
+    if events_element is None:
+        return []
+    globally_enabled = element_bool(events_element.find("Enabled"), default=True)
+    events: list[dict[str, Any]] = []
+    for event in events_element.findall("Event"):
+        tags = {local_name(child.tag).lower() for child in event.iter()}
+        if "sendmail" in tags or any(tag.startswith("email_") for tag in tags):
+            action = "email"
+        elif any("command" in tag for tag in tags):
+            action = "command"
+        else:
+            action = "workflow event"
+        events.append(
+            {
+                "when": clip(first_text(event, "When"), 80),
+                "action": action,
+                "enabled": globally_enabled,
+                "contains_secret_material": contains_secret_material(event),
+            }
+        )
+    return events
+
+
+def connection_record(connection: ET.Element) -> dict[str, str]:
+    origin = connection.find("Origin")
+    destination = connection.find("Destination")
+    return {
+        "origin_tool_id": origin.get("ToolID", "") if origin is not None else "",
+        "origin_anchor": origin.get("Connection", "") if origin is not None else "",
+        "destination_tool_id": destination.get("ToolID", "") if destination is not None else "",
+        "destination_anchor": destination.get("Connection", "") if destination is not None else "",
     }
 
 
@@ -167,11 +322,28 @@ def analyze(path: Path) -> dict[str, Any]:
     except ET.ParseError as exc:
         raise ValueError(f"Invalid XML in {path}: {exc}") from exc
 
-    nodes = [node_record(node) for node in root.findall(".//Node")]
-    connections = root.findall(".//Connections/Connection")
-    tool_counts = Counter(record["tool"] for record in nodes)
-    all_configuration = "\n".join(record.pop("configuration_text") for record in nodes)
-    all_lower = all_configuration.lower()
+    nodes = inventory_nodes(root)
+    active_nodes = [record for record in nodes if record["active"]]
+    connection_records = [
+        connection_record(connection)
+        for connection in root.findall(".//Connections/Connection")
+    ]
+    active_ids = {record["tool_id"] for record in active_nodes}
+    active_connections = [
+        connection
+        for connection in connection_records
+        if connection["origin_tool_id"] in active_ids
+        and connection["destination_tool_id"] in active_ids
+    ]
+    tool_counts = Counter(record["tool"] for record in active_nodes)
+    all_configuration = "\n".join(record["configuration_text"] for record in nodes)
+    active_configuration = "\n".join(
+        record["configuration_text"] for record in active_nodes
+    )
+    for record in nodes:
+        record.pop("configuration_text")
+    active_lower = active_configuration.lower()
+    events = workflow_events(root)
 
     sources = [
         {
@@ -180,7 +352,7 @@ def analyze(path: Path) -> dict[str, Any]:
             "location": record["source_location"],
             "connection": record["connection_title"],
         }
-        for record in nodes
+        for record in active_nodes
         if record["is_source"]
     ]
     outputs = [
@@ -189,41 +361,50 @@ def analyze(path: Path) -> dict[str, Any]:
             "tool": record["tool"],
             "location": record["output_location"],
             "side_effect": record["is_side_effect"],
+            "settings": record["output_settings"],
         }
-        for record in nodes
+        for record in active_nodes
         if record["is_output"]
     ]
-    macros = sorted({record["macro"] for record in nodes if record["macro"]})
+    macros = sorted({record["macro"] for record in active_nodes if record["macro"]})
 
     locations = "\n".join(
         [source["location"] for source in sources] + [output["location"] for output in outputs]
     ).lower()
     risks: list[str] = []
-    if any(record["contains_secret_material"] for record in nodes):
+    if any(record["contains_secret_material"] for record in nodes) or any(
+        event["contains_secret_material"] for event in events
+    ):
         risks.append("Embedded credential or secret material is present; values were not emitted.")
-    if "\\\\" in all_configuration or re.search(r"^[a-z]:\\", all_configuration, re.M | re.I):
+    if "\\\\" in active_configuration or re.search(
+        r"^[a-z]:\\", active_configuration, re.M | re.I
+    ):
         risks.append("SMB/UNC or local Windows paths require a landing step before Designer.")
     if ".yxdb" in locations:
         risks.append("YXDB is proprietary and requires an export/conversion step.")
     if ".hyper" in locations:
         risks.append("Hyper input/output should normally be replaced by a Unity Catalog table.")
-    if "sharepointversion" in all_lower and re.search(
-        r"<SharePointVersion>\s*2007\s*</SharePointVersion>", all_configuration, re.I
+    if "sharepointversion" in active_lower and re.search(
+        r"<SharePointVersion>\s*2007\s*</SharePointVersion>", active_configuration, re.I
     ):
         risks.append(
             "Legacy SharePoint 2007 configuration is present; managed OAuth ingestion is not a drop-in replacement."
         )
-    if re.search(r"https?://", all_configuration, re.I):
+    if re.search(r"https?://", active_configuration, re.I):
         risks.append(
             "HTTP endpoint configuration is present; review connectivity, secrets, preview safety, and idempotency."
         )
-    if any(record["is_side_effect"] for record in nodes):
+    if any(record["is_side_effect"] for record in active_nodes):
         risks.append(
             "Operational side effects are present and should be isolated from visual transformations."
         )
+    if any(event["enabled"] for event in events):
+        risks.append(
+            "Workflow-level Events are present and require an explicit Job, notification, or retirement decision."
+        )
     if any(
         "interface" in record["plugin"].lower() or "questions" in record["plugin"].lower()
-        for record in nodes
+        for record in active_nodes
     ):
         risks.append("Interface tools are present; map them to Job parameters or a Databricks App.")
 
@@ -232,21 +413,66 @@ def analyze(path: Path) -> dict[str, Any]:
         "document_type": path.suffix.lower().lstrip("."),
         "alteryx_version": root.get("yxmdVer", ""),
         "node_count": len(nodes),
-        "connection_count": len(connections),
-        "expression_count": sum(record["expression_count"] for record in nodes),
+        "active_node_count": len(active_nodes),
+        "connection_count": len(connection_records),
+        "active_connection_count": len(active_connections),
+        "expression_count": sum(record["expression_count"] for record in active_nodes),
         "max_expression_length": max(
-            (record["max_expression_length"] for record in nodes), default=0
+            (record["max_expression_length"] for record in active_nodes), default=0
         ),
         "tool_counts": dict(tool_counts.most_common()),
         "sources": sources,
         "outputs": outputs,
         "macros": macros,
+        "connections": active_connections,
+        "inactive_nodes": [
+            {
+                "tool_id": record["tool_id"],
+                "tool": record["tool"],
+                "reason": record["inactive_reason"],
+            }
+            for record in nodes
+            if not record["active"]
+        ],
+        "semantic_nodes": [
+            {
+                "tool_id": record["tool_id"],
+                "tool": record["tool"],
+                "join_keys": record["join_keys"],
+                "dropped_fields": [
+                    item["field"]
+                    for item in record["field_projection"]
+                    if not item["selected"]
+                ],
+                "renamed_fields": [
+                    {"field": item["field"], "rename": item["rename"]}
+                    for item in record["field_projection"]
+                    if item["rename"]
+                ],
+                "union_settings": record["union_settings"],
+            }
+            for record in active_nodes
+            if record["join_keys"]
+            or any(not item["selected"] or item["rename"] for item in record["field_projection"])
+            or record["union_settings"]
+        ],
+        "events": events,
         "risk_flags": risks,
     }
 
 
 def escape_cell(value: Any) -> str:
     return str(value or "").replace("|", "\\|").replace("\n", " ")
+
+
+def format_settings(settings: dict[str, Any]) -> str:
+    return ", ".join(f"{key}={value}" for key, value in settings.items())
+
+
+def format_join_keys(items: list[dict[str, Any]]) -> str:
+    return "; ".join(
+        f"{item['connection']}: {', '.join(item['fields'])}" for item in items
+    )
 
 
 def markdown_report(results: list[dict[str, Any]]) -> str:
@@ -258,10 +484,11 @@ def markdown_report(results: list[dict[str, Any]]) -> str:
                 "",
                 f"- Path: `{result['path']}`",
                 f"- Type/version: `{result['document_type']}` / `{result['alteryx_version'] or 'unknown'}`",
-                f"- Nodes/connections: {result['node_count']} / {result['connection_count']}",
+                f"- Nodes: {result['node_count']} total / {result['active_node_count']} active",
+                f"- Connections: {result['connection_count']} total / {result['active_connection_count']} active",
                 f"- Expressions: {result['expression_count']} (maximum length {result['max_expression_length']})",
                 "",
-                "### Tool counts",
+                "### Active tool counts",
                 "",
                 "| Tool | Count |",
                 "|---|---:|",
@@ -294,17 +521,69 @@ def markdown_report(results: list[dict[str, Any]]) -> str:
                 "",
                 "### Outputs and side effects",
                 "",
-                "| ID | Tool | Destination/action | Side effect |",
-                "|---|---|---|---|",
+                "| ID | Tool | Destination/action | Side effect | Settings |",
+                "|---|---|---|---|---|",
             ]
         )
         if result["outputs"]:
             lines.extend(
-                f"| {escape_cell(item['tool_id'])} | {escape_cell(item['tool'])} | {escape_cell(item['location'])} | {'yes' if item['side_effect'] else 'no'} |"
+                f"| {escape_cell(item['tool_id'])} | {escape_cell(item['tool'])} | {escape_cell(item['location'])} | {'yes' if item['side_effect'] else 'no'} | {escape_cell(format_settings(item['settings']))} |"
                 for item in result["outputs"]
             )
         else:
+            lines.append("|  |  | None detected |  |  |")
+
+        lines.extend(
+            [
+                "",
+                "### Active connections",
+                "",
+                "| Origin | Anchor | Destination | Anchor |",
+                "|---|---|---|---|",
+            ]
+        )
+        if result["connections"]:
+            lines.extend(
+                f"| {escape_cell(item['origin_tool_id'])} | {escape_cell(item['origin_anchor'])} | {escape_cell(item['destination_tool_id'])} | {escape_cell(item['destination_anchor'])} |"
+                for item in result["connections"]
+            )
+        else:
             lines.append("|  |  | None detected |  |")
+
+        lines.extend(
+            [
+                "",
+                "### Semantic configuration requiring parity",
+                "",
+                "| ID | Tool | Join keys | Dropped fields | Renames | Union settings |",
+                "|---|---|---|---|---|---|",
+            ]
+        )
+        if result["semantic_nodes"]:
+            lines.extend(
+                f"| {escape_cell(item['tool_id'])} | {escape_cell(item['tool'])} | {escape_cell(format_join_keys(item['join_keys']))} | {escape_cell(', '.join(item['dropped_fields']))} | {escape_cell(', '.join(change['field'] + ' → ' + change['rename'] for change in item['renamed_fields']))} | {escape_cell(format_settings(item['union_settings']))} |"
+                for item in result["semantic_nodes"]
+            )
+        else:
+            lines.append("|  |  | None detected |  |  |  |")
+
+        lines.extend(["", "### Inactive nodes", ""])
+        if result["inactive_nodes"]:
+            lines.extend(
+                f"- `{item['tool_id']}` {item['tool']}: {item['reason']}"
+                for item in result["inactive_nodes"]
+            )
+        else:
+            lines.append("- None detected")
+
+        lines.extend(["", "### Workflow-level Events", ""])
+        if result["events"]:
+            lines.extend(
+                f"- {item['when'] or 'Unspecified trigger'}: {item['action']} ({'enabled' if item['enabled'] else 'disabled'})"
+                for item in result["events"]
+            )
+        else:
+            lines.append("- None detected")
 
         lines.extend(["", "### Referenced macros", ""])
         if result["macros"]:

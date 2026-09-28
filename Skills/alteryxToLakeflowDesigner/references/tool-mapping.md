@@ -53,6 +53,24 @@ Alteryx Join exposes left-unmatched, matched, and right-unmatched anchors. Confi
 - right-side duplicate column names;
 - output field selection and renames.
 
+Treat the Join output projection as part of the tool's behavior, not cosmetic metadata.
+Read every configured `SelectField` and preserve deselected fields, aliases, types, and
+ordering. In particular, suppress redundant left or right join keys when Alteryx suppresses
+them; do not accept all input fields by default. After the Join, verify the concrete output
+schema for unexpected key columns and collision-generated names such as `right_*`.
+
+## Cross-runtime expression semantics
+
+Translate Formula expressions by behavior and test boundary examples when Alteryx and Spark
+use different conventions. Pay particular attention to:
+
+- zero-based Alteryx `FindString` versus one-based Spark SQL `locate`;
+- empty strings, nulls, and Alteryx `IsEmpty` behavior;
+- `PadLeft` versus `lpad`, including values already longer than the requested width;
+- `DateTimeToday` midnight and timezone semantics versus `current_date` or `current_timestamp`;
+- delimiter-not-found behavior in substring calculations;
+- sequential Formula fields where a later expression reads a value changed earlier in the same tool.
+
 ## SQL candidates
 
 Use SQL when it materially improves correctness or expressiveness, including:
