@@ -8,7 +8,7 @@ A set of [Databricks Genie Code](https://docs.databricks.com/aws/en/genie-code/s
 | Skill folder                       | Name                                           | Description                                                                                                                                                                                                                                                                                                                         |
 | ---------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Skills/alteryxToPythonSpark`      | **Alteryx Migration to PySpark on Databricks** | Converts Alteryx workflows (`.yxmd`, `.yxmc`, `.yxwz`) into Python / PySpark notebooks following a medallion (bronze / silver / gold) layout, with mandatory output validation against an expected result file.                                                                                                                     |
-| `Skills/alteryxToLakeflowDesigner` | **alteryx-to-vdp**                             | Converts Alteryx workflows into Databricks **Lakeflow Designer** (Visual Data Prep ETL) pipelines. Maps the full Alteryx tool palette to VDP operators (Source, Output, Aggregate, Combine, Filter, Join, Pivot, Sort, SQL, Transform, Python, AI Function, etc.) and materializes the final output to a Unity Catalog Delta table. See [`Skills/alteryxToLakeflowDesigner/Samples/`](Skills/alteryxToLakeflowDesigner/Samples/) for end-to-end conversion examples. |
+| `Skills/alteryxToLakeflowDesigner` | **alteryx-to-lakeflow-designer**                | Assesses and migrates Alteryx workflows into Databricks **Lakeflow Designer**. Separates source onboarding, visual transformation, governed outputs, operational side effects, and reconciliation instead of performing a brittle tool-for-tool translation. See [`Skills/alteryxToLakeflowDesigner/Samples/`](Skills/alteryxToLakeflowDesigner/Samples/) for regression examples. |
 | `Skills/alteryxToDatabricksSdp`    | **alteryx-to-databricks-sdp**                  | Converts Alteryx workflows into a runnable Databricks **Lakeflow Spark Declarative Pipeline (SDP)** expressed in pure SQL. Emits `CREATE OR REFRESH STREAMING TABLE` / `MATERIALIZED VIEW` files in bronze/silver/gold layers plus a `MANUAL_STEPS.md` for anything that can't be auto-converted.                                   |
 
 
@@ -21,7 +21,7 @@ Genie Code looks for skills in one of two workspace folders:
 - **Personal (just you):** `/Workspace/Users/<your-email>/.assistant/skills/`
 - **Shared (whole workspace):** `/Workspace/.assistant/skills/`
 
-Each skill must live in its own subfolder containing a `SKILL.md` at the root, e.g. `…/.assistant/skills/alteryx-to-vdp/SKILL.md`.
+Each skill must live in its own subfolder containing a `SKILL.md` at the root, e.g. `…/.assistant/skills/alteryx-to-lakeflow-designer/SKILL.md`.
 
 You can install via the Databricks CLI, a Git folder, or the UI.
 
@@ -57,7 +57,7 @@ done
 
 ### Verify the install
 
-In a Genie Code chat (Agent mode), type `@` — the three skills should appear in the autocomplete list. You can also invoke one directly, e.g. `@alteryx-to-vdp convert this workflow …`.
+In a Genie Code chat (Agent mode), type `@` — the three skills should appear in the autocomplete list. You can also invoke one directly, e.g. `@alteryx-to-lakeflow-designer assess and migrate this workflow …`.
 
 ## Feedback
 
@@ -65,4 +65,3 @@ For feedback, bug reports, or feature requests, reach out to:
 
 - Isaac Rahnema — [isaac.r@databricks.com](mailto:isaac.r@databricks.com)
 - Daphne Koch — [daphne.koch@databricks.com](mailto:daphne.koch@databricks.com)
-
