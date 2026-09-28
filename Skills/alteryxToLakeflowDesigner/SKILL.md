@@ -1,6 +1,8 @@
 ---
 name: alteryx-to-lakeflow-designer
 description: Analyze and migrate Alteryx Designer workflows (.yxmd and .yxmc) to Databricks Lakeflow Designer visual data prep. Use for migration assessments, source-readiness planning, Designer implementation, and reconciliation. Do not use for requests that specifically require PySpark notebooks or Lakeflow Spark Declarative Pipelines instead of Designer.
+metadata:
+  revision: 2026-09-28-staged-poc-v1
 ---
 
 # Alteryx to Lakeflow Designer
@@ -21,6 +23,28 @@ Depending on the request, produce one or more of:
 
 Do not claim a workflow is migrated when required sources are unavailable, manual nodes are unresolved, or validation has not been run. Missing access does not block an assessment or design.
 
+## Operating mode and approval gates
+
+Choose one mode for the current turn and stop at its boundary:
+
+| Mode | Work allowed | Stop condition |
+|---|---|---|
+| **Assess** | Inventory, dependency classification, risks, complexity, and recommended decomposition | Present source/output decisions and wait for approval |
+| **Design** | Target layers, operator/branch mapping, source contracts, output contracts, side-effect plan, and validation plan | Present the proposed graph and intentional semantic changes; wait for approval |
+| **Build** | Implement only the approved outputs or logical branches | Stop after structural checks and available previews for the approved scope |
+| **Validate** | Structural parity, reconciliation, and defect reporting | Report pass/fail and unresolved differences; do not silently redesign |
+| **Productionize** | Parameters, Jobs, delivery tasks, deployment, monitoring, and cutover plan | Stop before enabling schedules, external delivery, or side effects without explicit approval |
+
+For a broad request such as “migrate this workflow,” default to **Assess** when the workflow
+has unresolved sources, referenced macros, external actions, stateful behavior, multiple
+outputs, or substantial branching. Do not continue automatically from assessment or design
+into artifact generation. Human approval applies to source and output contracts, missing
+behavior, intentional semantic changes, and side effects—not to every routine operator.
+
+At the start of the result, report the skill revision from frontmatter and the selected mode.
+Read [references/staged-workflow.md](references/staged-workflow.md) for gate deliverables,
+risk-based decomposition, and continuation rules.
+
 ## Workflow
 
 ### 1. Inventory before translating
@@ -39,6 +63,10 @@ Use the XML itself as the source of truth. Identify:
 - referenced macros and interface tools;
 - external actions such as HTTP calls, email, commands, and file delivery;
 - embedded usernames, passwords, tokens, or connection material.
+
+Resolve referenced macro paths relative to the parent workflow and inspect adjacent supplied
+files before declaring a macro missing. If a referenced macro still cannot be found, mark its
+behavior unresolved and stop before building dependent branches. Never guess its output.
 
 Use the inventory's effective enabled state: a node inside a disabled Tool Container is
 inactive even when the node itself has no disabled flag. Keep inactive nodes in the
@@ -60,6 +88,12 @@ Classify each dependency as:
 
 Read [references/sources-and-outputs.md](references/sources-and-outputs.md) whenever a workflow contains files, databases, SharePoint, SFTP, proprietary formats, external outputs, or side effects.
 
+Never replace an unavailable external source or connector macro with fabricated Enter Data
+rows. Enter Data is only for genuine Alteryx Text Input constants or user-approved test
+fixtures that are clearly isolated from the migration graph. Use an approved Source contract
+when its target table or Volume is known; otherwise retain a Note/manual boundary and stop at
+assessment or design.
+
 ### 3. Design the target before editing the canvas
 
 Describe the target in four layers:
@@ -70,6 +104,10 @@ Describe the target in four layers:
 4. **Job orchestration**: schedules, dependencies, notifications, APIs, and delivery.
 
 Preserve required branch semantics, including Alteryx Filter true/false outputs and Join left-unmatched/matched/right-unmatched outputs. Consolidate repetitive branches when they implement the same rule over different metrics or periods.
+
+Consolidate operators only after recording why the change is equivalent. Preserve predicate
+types and boundaries, formula ordering, row multiplicity, and branch-specific cleansing. A
+shorter graph is not an improvement when it changes business behavior.
 
 Use the smallest graph that remains readable and independently testable. Do not optimize for either a one-to-one tool count or the fewest possible operators.
 
@@ -148,5 +186,7 @@ Read [references/validation.md](references/validation.md) before running reconci
 - Outputs match the agreed consumer contract; Delta is preferred, not forced when inappropriate.
 - Final output projections contain no unintended join keys or collision-generated columns.
 - Workflow-level Events and other operational actions are mapped to Jobs, retained as explicit follow-up work, or intentionally retired.
+- No fabricated source rows stand in for unavailable files, databases, connectors, or macros.
+- Every graph consolidation has an explicit equivalence rationale and structural parity check.
 - Validation was run on comparable data and material differences are explained.
 - The Designer graph opens successfully and a full run completes, or remaining blockers are stated.

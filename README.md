@@ -11,6 +11,78 @@ A set of [Databricks Genie Code](https://docs.databricks.com/aws/en/genie-code/s
 | `Skills/alteryxToLakeflowDesigner` | **alteryx-to-lakeflow-designer**                | Assesses and migrates Alteryx workflows into Databricks **Lakeflow Designer**. Separates source onboarding, visual transformation, governed outputs, operational side effects, and reconciliation instead of performing a brittle tool-for-tool translation. See [`Skills/alteryxToLakeflowDesigner/Samples/`](Skills/alteryxToLakeflowDesigner/Samples/) for regression examples. |
 | `Skills/alteryxToDatabricksSdp`    | **alteryx-to-databricks-sdp**                  | Converts Alteryx workflows into a runnable Databricks **Lakeflow Spark Declarative Pipeline (SDP)** expressed in pure SQL. Emits `CREATE OR REFRESH STREAMING TABLE` / `MATERIALIZED VIEW` files in bronze/silver/gold layers plus a `MANUAL_STEPS.md` for anything that can't be auto-converted.                                   |
 
+## Recommended POC workflow for Lakeflow Designer
+
+Use `alteryx-to-lakeflow-designer` in stages. A single “migrate this workflow” request can be
+slow and can force the agent to guess source contracts, missing macro behavior, output
+delivery, or side effects. The staged process puts a human decision only where it can change
+the result:
+
+```text
+assessment → source/output approval → design → graph approval
+           → scoped build → structural validation → reconciliation
+```
+
+The skill supports five modes: **Assess**, **Design**, **Build**, **Validate**, and
+**Productionize**. It stops at the boundary of the requested mode. For complex workflows,
+build one output or logical branch at a time; for small low-risk workflows, approve all
+branches in the design gate and build them together.
+
+### 1. Run a quick assessment
+
+Provide the parent directory when the workflow references `.yxmc` macros so the skill can
+resolve them. Do not upload only the `.yxmd` and expect missing macros to be inferred.
+
+```text
+@alteryx-to-lakeflow-designer
+Mode: Assess only. Do not create or modify a visual data prep.
+
+Assess <workflow-or-directory>. Report the loaded skill revision, active and inactive nodes,
+resolved and missing macros, source readiness, outputs, workflow Events, semantic hotspots,
+and a recommended build decomposition. Stop for source/output approval.
+```
+
+### 2. Approve the design
+
+```text
+@alteryx-to-lakeflow-designer
+Mode: Design only. Use the approved source and output decisions from the assessment.
+
+Design the ingestion, Designer transformation, published outputs, and Job orchestration.
+Provide the node/pattern mapping, expected output schemas, consolidation rationales, and
+validation plan. Do not build yet. Stop for graph approval.
+```
+
+### 3. Build a bounded scope
+
+```text
+@alteryx-to-lakeflow-designer
+Mode: Build. Implement only <approved output or branch> from the approved design.
+
+Do not fabricate Enter Data rows for unavailable sources. Add meaningful Guardrails, preview
+available intermediate data, run structural parity checks, and stop with the validation stage
+reached and the next branch to request.
+```
+
+### 4. Validate before productionizing
+
+```text
+@alteryx-to-lakeflow-designer
+Mode: Validate. Compare the approved Designer scope with the Alteryx inventory and frozen
+baseline. Report structural, schema, population, value, boundary, and operational differences.
+Do not redesign or productionize automatically.
+```
+
+Only request **Productionize** after the output owner accepts the reconciliation. Enabling
+schedules, external file delivery, APIs, or messages remains a separate explicit approval.
+
+### Confirm that an updated skill is loaded
+
+An open Genie Code chat can retain an older skill in its context after the workspace files
+change. Start a fresh chat after installing an update, or explicitly ask Genie Code to reload
+the skill. The assessment response should report the revision from `SKILL.md`; the current
+Lakeflow Designer revision is `2026-09-28-staged-poc-v1`.
+
 
 
 
