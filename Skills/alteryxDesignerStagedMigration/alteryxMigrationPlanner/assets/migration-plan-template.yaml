@@ -1,0 +1,29 @@
+schema_version: 1
+plan_id: ""
+status: draft
+planner:
+  skill: alteryx-migration-planner
+  revision: 2026-09-29-plan-v1
+workflow:
+  primary_path: ""
+  sha256: ""
+  macros: []
+  inventory:
+    active_nodes: 0
+    inactive_nodes: 0
+    active_connections: 0
+sources: []
+outputs: []
+events: []
+branches: []
+node_mappings: []
+semantic_decisions: []
+validation:
+  structural: []
+  data: []
+  boundary: []
+  operational: []
+unresolved: []
+approvals:
+  source_output_contracts: pending
+  graph_and_semantics: pending

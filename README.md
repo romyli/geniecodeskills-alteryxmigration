@@ -9,6 +9,7 @@ A set of [Databricks Genie Code](https://docs.databricks.com/aws/en/genie-code/s
 | ---------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Skills/alteryxToPythonSpark`      | **Alteryx Migration to PySpark on Databricks** | Converts Alteryx workflows (`.yxmd`, `.yxmc`, `.yxwz`) into Python / PySpark notebooks following a medallion (bronze / silver / gold) layout, with mandatory output validation against an expected result file.                                                                                                                     |
 | `Skills/alteryxToLakeflowDesigner` | **alteryx-to-lakeflow-designer**                | Assesses and migrates Alteryx workflows into Databricks **Lakeflow Designer**. Separates source onboarding, visual transformation, governed outputs, operational side effects, and reconciliation instead of performing a brittle tool-for-tool translation. See [`Skills/alteryxToLakeflowDesigner/Samples/`](Skills/alteryxToLakeflowDesigner/Samples/) for regression examples. |
+| `Skills/alteryxDesignerStagedMigration` | **Staged Designer migration pack** | Splits planning and implementation into `alteryx-migration-planner` and `alteryx-to-lakeflow-designer-builder`, connected by a review notebook and versioned YAML plan. See the [pack README](Skills/alteryxDesignerStagedMigration/README.md). |
 | `Skills/alteryxToDatabricksSdp`    | **alteryx-to-databricks-sdp**                  | Converts Alteryx workflows into a runnable Databricks **Lakeflow Spark Declarative Pipeline (SDP)** expressed in pure SQL. Emits `CREATE OR REFRESH STREAMING TABLE` / `MATERIALIZED VIEW` files in bronze/silver/gold layers plus a `MANUAL_STEPS.md` for anything that can't be auto-converted.                                   |
 
 ## Recommended POC workflow for Lakeflow Designer
@@ -114,6 +115,17 @@ DEST=/Users/$(databricks current-user me | jq -r .userName)/.assistant/skills
 for skill in alteryxToPythonSpark alteryxToLakeflowDesigner alteryxToDatabricksSdp; do
   databricks workspace import-dir "Skills/$skill" "$DEST/$skill" --overwrite
 done
+```
+
+The staged Designer pack contains two independently installable skills:
+
+```bash
+databricks workspace import-dir \
+  Skills/alteryxDesignerStagedMigration/alteryxMigrationPlanner \
+  "$DEST/alteryxMigrationPlanner" --overwrite
+databricks workspace import-dir \
+  Skills/alteryxDesignerStagedMigration/alteryxToLakeflowDesignerBuilder \
+  "$DEST/alteryxToLakeflowDesignerBuilder" --overwrite
 ```
 
 ### Option 2 — Databricks Git folder
