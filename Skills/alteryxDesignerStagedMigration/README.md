@@ -43,6 +43,45 @@ databricks workspace import-dir \
   "$DEST/alteryxToLakeflowDesignerBuilder" --overwrite
 ```
 
+### Install through the Databricks UI
+
+Install both child skill folders directly under the Genie Code skills directory. Do not
+upload the parent `alteryxDesignerStagedMigration` folder as one skill because it does not
+contain a root `SKILL.md`.
+
+1. Download or check out `Skills/alteryxDesignerStagedMigration/` from this repository.
+2. Open Genie Code in the Databricks workspace, select **Settings** (the gear icon), and
+   click **Open skills folder**. This opens your personal directory:
+   `/Workspace/Users/<your-email>/.assistant/skills/`.
+3. Under `skills`, create these two folders:
+
+   - `alteryxMigrationPlanner`
+   - `alteryxToLakeflowDesignerBuilder`
+
+4. Upload each local child folder's contents into its matching workspace folder. If your
+   workspace supports folder upload, upload both child folders directly. Otherwise create
+   the `assets`, `references`, and `scripts` subfolders in the UI and upload their files
+   separately. Preserve this structure:
+
+   ```text
+   .assistant/skills/
+   ├── alteryxMigrationPlanner/
+   │   ├── SKILL.md
+   │   ├── assets/
+   │   ├── references/
+   │   └── scripts/
+   └── alteryxToLakeflowDesignerBuilder/
+       ├── SKILL.md
+       ├── references/
+       └── scripts/
+   ```
+
+5. For a shared installation, use `/Workspace/.assistant/skills/` instead. You need
+   permission to create and manage files there, and intended users need read access.
+6. Start a new Genie Code Agent-mode chat and type `@`. Confirm that both
+   `alteryx-migration-planner` and `alteryx-to-lakeflow-designer-builder` appear in
+   autocomplete.
+
 After updating installed skill files, start a fresh Genie Code chat or explicitly reload the
 skill. Confirm the revision printed at the start of each result.
 

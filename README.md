@@ -128,62 +128,20 @@ databricks workspace import-dir \
   "$DEST/alteryxToLakeflowDesignerBuilder" --overwrite
 ```
 
-### Option 2 — Databricks UI upload (one skill)
+### Option 2 — Databricks Git folder
 
-Use this option to install only the Lakeflow Designer skill without cloning the whole
-repository.
+1. In the Databricks UI: **Workspace → Users → **** → .assistant → skills**, create the `.assistant/skills` path if it does not exist.
+2. From the Databricks UI, **Add → Git folder** and clone this repo into a scratch location (e.g. `/Workspace/Users/<you>/repos/GenieCodeSkills_AlteryxMigration`).
+3. Move (or symlink/copy) each subdirectory under `Skills/` into `…/.assistant/skills/`. Genie Code will pick up changes automatically when you next open the panel.
 
-1. Download or check out
-   `Skills/alteryxToLakeflowDesigner/` from this repository to your computer.
-2. Open Genie Code in the Databricks workspace, select **Settings** (the gear icon),
-   and click **Open skills folder**. This opens your personal skills directory:
-   `/Workspace/Users/<your-email>/.assistant/skills/`.
-3. In the workspace file browser, create a folder named
-   `alteryxToLakeflowDesigner` under `skills`.
-4. Upload the contents of the local `alteryxToLakeflowDesigner` folder into the new
-   workspace folder. If your workspace supports folder upload, upload the folder in one
-   operation. Otherwise create the `references` and `scripts` subfolders in the UI and
-   upload their files separately. Preserve this structure:
+### Option 3 — UI upload
 
-   ```text
-   .assistant/skills/alteryxToLakeflowDesigner/
-   ├── SKILL.md
-   ├── references/
-   │   ├── designer-authoring.md
-   │   ├── sources-and-outputs.md
-   │   ├── tool-mapping.md
-   │   └── validation.md
-   └── scripts/
-       └── inventory_alteryx.py
-   ```
-
-   The `Samples/` folder is useful for regression testing but is not required to run the
-   skill.
-5. To make the skill available to the whole workspace instead, create the same folder at
-   `/Workspace/.assistant/skills/alteryxToLakeflowDesigner/`. You need permission to
-   create and manage files there; confirm that intended users have read access.
-6. Start a new Genie Code Agent-mode chat after the upload. Existing chats can retain an
-   older copy of a skill in their context.
-
-### Option 3 — Databricks Git folder
-
-1. From the Databricks UI, select **Workspace → Add → Git folder** and clone this repo
-   into a scratch location such as
-   `/Workspace/Users/<your-email>/repos/GenieCodeSkills_AlteryxMigration`.
-2. Create the personal path
-   `/Workspace/Users/<your-email>/.assistant/skills/` or the shared path
-   `/Workspace/.assistant/skills/` if it does not exist.
-3. Copy the required skill folder from `Skills/` into the chosen `skills` directory.
-   Keep `SKILL.md` at the root of that copied folder and preserve all referenced
-   subdirectories.
-4. Pull future repository changes into the Git folder, then copy the updated skill files
-   to the discovery directory and start a new Genie Code chat.
+1. In the Genie Code panel, click **Settings → Open skills folder**. Databricks opens `/Workspace/Users/<you>/.assistant/skills/` (or the shared folder).
+2. For each skill in this repo, create a subfolder with the same name and drag-and-drop its `SKILL.md` (plus any subdirectories) into the workspace folder.
 
 ### Verify the install
 
-In a new Genie Code chat (Agent mode), type `@` and confirm that
-`alteryx-to-lakeflow-designer` appears in autocomplete. You can invoke it directly, for
-example: `@alteryx-to-lakeflow-designer assess this workflow …`.
+In a Genie Code chat (Agent mode), type `@` — the three skills should appear in the autocomplete list. You can also invoke one directly, e.g. `@alteryx-to-lakeflow-designer assess and migrate this workflow …`.
 
 ## Feedback
 
